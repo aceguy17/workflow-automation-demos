@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Lead Qualifier</title>
+<meta name="description" content="Personal demo: an AI workflow that reads a website enquiry, scores the lead, updates the CRM, alerts the team and drafts a reply.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar"><div class="wrap">
+  <a class="brand" href="index.html"><span class="brand-mark">⇢</span>Workflow Automation Demos</a>
+  <nav id="nav" aria-label="Demos"></nav>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">Demo 1 · Sales &amp; enquiries</p>
+    <h1>AI lead qualifier: enquiry in, CRM updated, reply drafted</h1>
+    <p class="lede">A new website enquiry triggers the workflow. AI pulls out the contact details, budget, timeline and need, scores the lead, then creates or updates the CRM record, alerts the team and drafts a personal reply for approval.</p>
+    <div class="badges"><span class="badge">Trigger: web form / inbox</span><span class="badge">Builds in n8n, Make or Zapier</span><span class="badge">Human approval before sending</span><span class="badge">Fictional sample data</span></div>
+  </section>
+
+  <div class="grid">
+    <section class="panel col-input" aria-labelledby="h-in">
+      <div class="panel-h"><span class="step-n">1</span><h2 id="h-in">Incoming enquiry</h2></div>
+      <div class="panel-b">
+        <div class="samples" id="samples"></div>
+        <div class="input-meta" id="meta"></div>
+        <label class="sr" for="src">Enquiry text</label>
+        <textarea class="src" id="src" spellcheck="false"></textarea>
+        <div class="actions"><button class="btn" id="run" type="button">▶ Run workflow</button><button class="btn ghost" id="reset" type="button">Reset</button><span class="hint">Edit the text or paste your own.</span></div>
+      </div>
+    </section>
+
+    <section class="panel col-pipe" aria-labelledby="h-pipe">
+      <div class="panel-h"><span class="step-n">2</span><h2 id="h-pipe">Workflow</h2></div>
+      <div class="panel-b"><ol class="pipe" id="pipe"></ol><div class="runstats" id="stats"></div></div>
+    </section>
+
+    <section class="panel col-results" aria-labelledby="h-out">
+      <div class="panel-h"><span class="step-n">3</span><h2 id="h-out">What lands in your tools</h2></div>
+      <div class="panel-b"><div class="results" id="results" aria-live="polite"></div></div>
+    </section>
+  </div>
+
+  <section class="explain">
+    <div class="panel"><div class="panel-b"><h3>The problem</h3><p>Enquiries sit in an inbox for hours. Someone copies details into the CRM by hand, good leads wait as long as spam, and replies are slow and generic.</p></div></div>
+    <div class="panel"><div class="panel-b"><h3>What the workflow does</h3><ul><li>Pulls out name, company, contact, need, budget and timeline</li><li>Scores fit and urgency, filters out spam</li><li>Creates or updates the CRM record (no duplicates)</li><li>Alerts the right person and drafts a tailored reply</li></ul></div></div>
+    <div class="panel"><div class="panel-b"><h3>In a real build</h3><ul><li>Trigger: website form, Gmail/Outlook, Facebook lead ads</li><li>AI: OpenAI or Claude API with structured output</li><li>CRM: HubSpot, Salesforce, Pipedrive or Zoho</li><li>Alerts: Slack, Teams or email. Replies stay drafts until a person approves them</li></ul></div></div>
+  </section>
+
+  <p class="note">Personal demo with fictional people and companies. The AI steps are simulated in your browser with rule-based extraction so you can try it without an account. Nothing you type is sent anywhere. A client build connects to real systems and an LLM API.</p>
+</main>
+
+<script src="engine.js"></script>
+<script>
+(() => {
+  const { esc, pill, kv, card, find, titleCase } = WD;
+
+  // Existing CRM contacts used for duplicate matching (fictional)
+  const CRM = [
+    { email: 'daniel.ng@harbourjoinery.com.au', name: 'Daniel Ng', company: 'Harbour Joinery', owner: 'Irfan', stage: 'Customer', since: 'Mar 2026' },
+  ];
+
+  const samples = [
+    { label: 'Hot lead', meta: 'Website contact form · received 9:14 am', text: `
+Name: Priya Raman
+Email: priya.raman@brightlinephysio.com.au
+Phone: 0412 555 019
+Company: Brightline Physio Group
+
+Hi there,
+
+I'm the operations manager at Brightline Physio Group. We have 6 clinics and about 40 staff. Right now our front desk copies new patient bookings from our booking system into spreadsheets and we email weekly reports by hand.
+
+We'd like to automate the booking-to-report process and get a simple dashboard for clinic managers. Our budget is around $6,000 - $8,000 and we'd like to start within the next 2 weeks.
+
+Could we book a call this week?
+
+Thanks,
+Priya` },
+    { label: 'Warm lead', meta: 'Website contact form · received 1:52 pm', text: `
+Name: Tom Bassett
+Email: tom@thecornerroastery.com
+Company: The Corner Roastery
+
+Hey,
+
+We run a small cafe and roastery and our website is pretty dated. Looking for a new site and maybe a chatbot to answer questions about wholesale orders and opening hours.
+
+Budget is probably about $1,500. No rush, sometime in the next few months would be fine.
+
+Cheers,
+Tom` },
+    { label: 'Existing customer', meta: 'Email to hello@ inbox · received 4:05 pm', text: `
+From: Daniel Ng <daniel.ng@harbourjoinery.com.au>
+Subject: Adding a job costing view
+
+Hi Irfan,
+
+The sales dashboard has been great. We'd now like to add a job costing view that pulls from our quoting spreadsheet so we can see margin per job.
+
+Can you quote for this? Ideally done by the end of next month. Happy to spend up to $2,500.
+
+Regards,
+Daniel Ng
+Harbour Joinery
+0398 555 214` },
+    { label: 'Spam', meta: 'Website contact form · received 2:31 am', text: `
+Name: Mark
+Email: mark.seo.growth@outlook-mail.net
+
+Dear Website Owner,
+
+We offer guaranteed first page SEO ranking and high quality guest post backlinks for your website. Cheap packages starting $49! Visit http://seo-boost-xyz.example http://cheap-links.example http://rank-fast.example
+
+Reply now for special discount!!!` },
+  ];
+
+  const SERVICES = [
+    [/dashboard|report(ing|s)?|kpi/i, 'Dashboard & reporting'],
+    [/automat|workflow|zapier|make\.com|n8n|copy(ing)? .* into|by hand|manual/i, 'Workflow automation'],
+    [/chat ?bot|faq/i, 'AI chatbot'],
+    [/website|web site|landing page/i, 'Website'],
+    [/salesforce|crm|hubspot/i, 'CRM setup'],
+    [/job costing|margin|spreadsheet/i, 'Dashboard & reporting'],
+  ];
+
+  function extract(t) {
+    const email = find(t, /([\w.+-]+@[\w-]+(\.[\w-]+)+)/);
+    const phone = find(t, /((\+61|0)[2-478](?:[ -]?\d){8})/);
+    let name = find(t, /^\s*Name:\s*(.+)$/im) || find(t, /^From:\s*([^<\n]+)</im) || find(t, /\b(?:I'm|I am|my name is)\s+([A-Z][a-z]+(?: [A-Z][a-z]+)?)/);
+    if (!name) name = find(t, /\n(?:Thanks|Cheers|Regards|Kind regards|Best),?\s*\n\s*([A-Z][a-z]+(?: [A-Z][a-z]+)?)/);
+    let company = find(t, /^\s*Company:\s*(.+)$/im) || find(t, /\n(?:Thanks|Cheers|Regards|Kind regards|Best),?\s*\n[^\n]+\n\s*([A-Z][\w&' ]+?)\s*\n/) || find(t, /\b(?:at|from)\s+([A-Z][\w&']+(?: [A-Z][\w&']+){0,3})/);
+    const nums = [...t.matchAll(/\$\s?([\d,]+(?:\.\d+)?)(k)?/gi)].map((m) => parseFloat(m[1].replace(/,/g, '')) * (m[2] ? 1000 : 1));
+    const budgetMax = nums.length ? Math.max(...nums) : null;
+    const budgetMin = nums.length ? Math.min(...nums) : null;
+    let timeline = '', urgency = 0;
+    if (/(\d+|two|three|few)\s+weeks?/i.test(t)) { timeline = 'Within ' + find(t, /((\d+|two|three|few)\s+weeks?)/i); urgency = 22; }
+    else if (/asap|urgent|immediately|start this week/i.test(t)) { timeline = 'ASAP'; urgency = 25; }
+    else if (/next month|end of (next )?month/i.test(t)) { timeline = 'By end of next month'; urgency = 16; }
+    else if (/months?/i.test(t)) { timeline = 'Next few months'; urgency = 8; }
+    else { timeline = 'Not stated'; urgency = 4; }
+    const services = [...new Set(SERVICES.filter(([re]) => re.test(t)).map(([, s]) => s))];
+    const team = find(t, /(\d+)\s+(?:staff|employees|people)/i);
+    const locations = find(t, /(\d+)\s+(?:clinics|stores|sites|locations|offices)/i);
+    const links = (t.match(/https?:\/\//g) || []).length;
+    const spam = links >= 2 || /guaranteed|backlink|guest post|crypto|dear website owner/i.test(t);
+    return { email, phone, name: name ? titleCase(name) : '', company, budgetMin, budgetMax, timeline, urgency, services, team, locations, spam, links };
+  }
+
+  function score(x) {
+    const b = x.budgetMax == null ? 5 : x.budgetMax >= 5000 ? 30 : x.budgetMax >= 2000 ? 22 : x.budgetMax >= 800 ? 14 : 6;
+    const fit = x.services.length ? Math.min(25, 15 + x.services.length * 5) : 6;
+    const contact = (x.email ? 6 : 0) + (x.phone ? 4 : 0);
+    const org = x.company ? (x.team || x.locations ? 10 : 7) : 2;
+    const parts = [['Budget', b, 30], ['Urgency', x.urgency, 25], ['Service fit', fit, 25], ['Contact details', contact, 10], ['Organisation', org, 10]];
+    const total = x.spam ? 0 : parts.reduce((a, p) => a + p[1], 0);
+    const tier = x.spam ? 'Spam' : total >= 70 ? 'Hot' : total >= 45 ? 'Warm' : 'Nurture';
+    return { parts, total, tier };
+  }
+
+  const fmtBudget = (x) => x.budgetMax == null ? 'Not stated' : (x.budgetMin !== x.budgetMax ? `A$${x.budgetMin.toLocaleString()}–${x.budgetMax.toLocaleString()}` : `Up to A$${x.budgetMax.toLocaleString()}`);
+  const tone = { Hot: 'bad', Warm: 'warn', Nurture: 'info', Spam: 'neutral' };
+
+  function draft(x, s, existing) {
+    const first = (x.name || 'there').split(' ')[0];
+    const svc = x.services[0] || 'your project';
+    let body = `Hi ${first},\n\n`;
+    if (existing) body += `Great to hear from you again, and glad the dashboard is working well for the team.\n\n`;
+    else body += `Thanks for getting in touch${x.company ? ' about ' + x.company : ''}.\n\n`;
+    if (x.services.includes('Workflow automation') && x.services.includes('Dashboard & reporting'))
+      body += `Automating the booking-to-report process and giving each manager a live dashboard is a good fit. Usually we start by mapping where the data comes from, then automate the handoff so nobody is copying rows by hand.\n\n`;
+    else if (svc === 'Website' || x.services.includes('AI chatbot'))
+      body += `A refreshed site with a FAQ chatbot for wholesale and opening-hours questions is very doable. I can show you a couple of examples so you can see what you'd get.\n\n`;
+    else if (!existing) body += `I'd be happy to scope the ${svc.toLowerCase()} work with you.\n\n`;
+    if (existing) body += `Adding that on top of your current dashboard is straightforward. If you can share the quoting spreadsheet (or a sample), I'll come back with a fixed quote and timeline within two business days.\n\n`;
+    else if (s.tier === 'Hot') body += `Would a 20-minute call on Thursday or Friday suit? Reply with a time and I'll send an invite.\n\n`;
+    else body += `When you're ready, send through a few sites you like and a list of the questions customers ask most, and I'll put together a fixed quote.\n\n`;
+    return body + `Kind regards,\nIrfan`;
+  }
+
+  WD.init({
+    id: 'lead-qualifier',
+    samples,
+    steps: [
+      { icon: '⚡', title: 'New enquiry received', tool: 'Webhook', desc: 'Form submission or new email in the enquiries inbox.' },
+      { icon: '⌕', title: 'Check for existing contact', tool: 'CRM lookup', desc: 'Match by email so repeat customers are not duplicated.' },
+      { icon: '✦', title: 'Extract lead details', tool: 'AI · structured output', ai: true, desc: 'Name, company, contact, need, budget, timeline.' },
+      { icon: '✦', title: 'Score and classify', tool: 'AI + rules', ai: true, desc: 'Fit, budget and urgency score. Spam filter.' },
+      { icon: '⑂', title: 'Route by tier', tool: 'Router', desc: 'Hot → sales now · Warm → follow-up · Spam → archive.' },
+      { icon: '▤', title: 'Create / update CRM record', tool: 'CRM', desc: 'Lead, notes, score and next step.' },
+      { icon: '✉', title: 'Alert the team', tool: 'Slack / Teams', desc: 'Hot leads ping the owner straight away.' },
+      { icon: '✎', title: 'Draft a personal reply', tool: 'AI → email draft', ai: true, desc: 'Saved as a draft for a person to approve.' },
+    ],
+    process(text) {
+      const x = extract(text);
+      const s = score(x);
+      const existing = CRM.find((c) => x.email && c.email.toLowerCase() === x.email.toLowerCase());
+      const lines = text.trim().split('\n').length;
+      const steps = [
+        `Payload: ${lines} lines, ${text.length} chars`,
+        existing ? `Match found: ${existing.name} (${existing.stage}, since ${existing.since}) → update, don't create` : `No match for ${x.email || 'unknown email'} → new lead`,
+        JSON.stringify({ name: x.name || null, company: x.company || null, email: x.email || null, phone: x.phone || null, need: x.services, budget: fmtBudget(x), timeline: x.timeline }, null, 1).replace(/\n\s*/g, ' '),
+        x.spam ? `Spam signals: ${x.links} links, sales language → score 0` : `Score ${s.total}/100 → ${s.tier}`,
+        x.spam ? 'Spam → archived, no CRM record' : existing ? 'Existing customer → account owner' : s.tier === 'Hot' ? 'Hot → assign to owner, alert now' : s.tier === 'Warm' ? 'Warm → follow-up within 1 business day' : 'Nurture → newsletter sequence',
+        x.spam ? { skip: true, text: 'Skipped (spam)' } : existing ? 'Updated contact, opened new deal' : 'Created lead + deal',
+        x.spam ? { skip: true, text: 'Skipped (spam)' } : existing ? 'Posted to #accounts with @owner' : s.tier === 'Hot' ? 'Posted to #sales with @mention' : 'Posted to #leads',
+        x.spam ? { skip: true, text: 'Skipped (spam)' } : 'Draft saved, waiting for approval',
+      ];
+      const cards = [];
+      if (x.spam) {
+        cards.push(card('Inbox', 'archived', `<p>${pill('Spam', 'neutral')} Marked as spam and archived. No CRM record, no alert, no reply.</p><p class="hint">Why: ${x.links} external links, "guaranteed ranking" and backlink sales language.</p>`));
+        return { steps, cards, stats: [['Records created', '0']] };
+      }
+      const breakdown = s.parts.map(([k, v, max]) => `<div class="score-row"><span>${k}</span><b>${v}/${max}</b></div><div class="meter"><span style="width:${(v / max) * 100}%"></span></div>`).join('');
+      cards.push(card('CRM', existing ? 'contact updated · new deal' : 'new lead · new deal', kv([
+        ['Contact', `<b>${esc(x.name || 'Unknown')}</b>${x.company ? ' · ' + esc(x.company) : ''}`, true],
+        ['Email', x.email], ['Phone', x.phone],
+        ['Lead status', `${pill(s.tier + ' · ' + s.total + '/100', tone[s.tier])}${existing ? ' ' + pill('Existing customer', 'good') : ''}`, true],
+        ['Interested in', x.services.join(', ') || 'Unclear, ask on call'],
+        ['Budget', fmtBudget(x)], ['Timeline', x.timeline],
+        (x.team || x.locations) && ['Size', [x.locations && x.locations + ' locations', x.team && x.team + ' staff'].filter(Boolean).join(' · ')],
+        ['Owner', existing ? existing.owner + ' (account owner)' : s.tier === 'Hot' ? 'Irfan' : 'Sales queue'],
+        ['Next step', existing ? 'Send quote within 2 days' : s.tier === 'Hot' ? 'Call within 4 business hours' : 'Follow up within 1 business day'],
+      ])));
+      cards.push(card('Lead score', 'AI + rules', breakdown));
+      const icon = existing ? '🔁' : s.tier === 'Hot' ? '🔥' : '📥';
+      cards.push(card(existing ? 'Slack · #accounts' : s.tier === 'Hot' ? 'Slack · #sales' : 'Slack · #leads', 'just now', `<div class="msg">${icon} <b>${existing ? 'Repeat customer enquiry' : s.tier === 'Hot' ? 'Hot lead' : 'New lead'}</b>${existing || s.tier === 'Hot' ? ' · @Irfan' : ''}
+${esc(x.name || 'Unknown')}${x.company ? ' · ' + esc(x.company) : ''}
+Wants: ${esc(x.services.join(', ') || 'unclear')}
+Budget: ${esc(fmtBudget(x))} · Timeline: ${esc(x.timeline)}
+Score ${s.total}/100 · Reply draft ready for approval</div>`));
+      cards.push(card('Email draft', 'needs approval', `<div class="email-meta"><div><b>To:</b> ${esc(x.email || '(no email found)')}</div><div><b>Subject:</b> Re: ${esc(x.services[0] || 'your enquiry')}${x.company ? ' for ' + esc(x.company) : ''}</div></div><div class="msg">${esc(draft(x, s, existing))}</div><div class="review-bar"><button class="btn approve" type="button">Approve &amp; send</button><button class="btn ghost" type="button">Edit</button></div>`));
+      return { steps, cards, stats: [['Records', existing ? '1 updated' : '1 created']] };
+    },
+    after(root) {
+      root.querySelectorAll('.approve').forEach((b) => b.addEventListener('click', () => { b.textContent = '✓ Sent (demo, nothing actually sent)'; b.disabled = true; }));
+    },
+  });
+})();
+</script>
+</body>
+</html>

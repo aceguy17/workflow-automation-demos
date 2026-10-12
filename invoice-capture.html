@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Invoice Capture</title>
+<meta name="description" content="Personal demo: an AI workflow that reads emailed supplier invoices, extracts and checks the figures, flags exceptions and adds a row to the bills sheet.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar"><div class="wrap">
+  <a class="brand" href="index.html"><span class="brand-mark">⇢</span>Workflow Automation Demos</a>
+  <nav id="nav" aria-label="Demos"></nav>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">Demo 2 · Finance &amp; admin</p>
+    <h1>Invoice capture: emailed bills into your sheet, checked and flagged</h1>
+    <p class="lede">A supplier emails an invoice. The workflow reads the attachment, AI extracts the supplier, ABN, line items, GST and totals, then checks the numbers, catches duplicates, applies your approval rule and adds the row to the bills register. Only problems need a person.</p>
+    <div class="badges"><span class="badge">Trigger: bills@ inbox</span><span class="badge">GST and ABN checks</span><span class="badge">Duplicate detection</span><span class="badge">Fictional sample data</span></div>
+  </section>
+
+  <div class="grid">
+    <section class="panel col-input" aria-labelledby="h-in">
+      <div class="panel-h"><span class="step-n">1</span><h2 id="h-in">Incoming email + invoice</h2></div>
+      <div class="panel-b">
+        <div class="samples" id="samples"></div>
+        <div class="input-meta" id="meta"></div>
+        <label class="sr" for="src">Invoice text</label>
+        <textarea class="src" id="src" spellcheck="false"></textarea>
+        <div class="actions"><button class="btn" id="run" type="button">▶ Run workflow</button><button class="btn ghost" id="reset" type="button">Reset</button><span class="hint">Rows build up in the sheet as you run more samples.</span></div>
+      </div>
+    </section>
+
+    <section class="panel col-pipe" aria-labelledby="h-pipe">
+      <div class="panel-h"><span class="step-n">2</span><h2 id="h-pipe">Workflow</h2></div>
+      <div class="panel-b"><ol class="pipe" id="pipe"></ol><div class="runstats" id="stats"></div></div>
+    </section>
+
+    <section class="panel col-results" aria-labelledby="h-out">
+      <div class="panel-h"><span class="step-n">3</span><h2 id="h-out">What lands in your tools</h2></div>
+      <div class="panel-b"><div class="results" id="results" aria-live="polite"></div></div>
+    </section>
+  </div>
+
+  <section class="explain">
+    <div class="panel"><div class="panel-b"><h3>The problem</h3><p>Someone opens every supplier email, downloads the PDF, types the figures into a spreadsheet or accounting system, and hopes they spot the duplicate or the wrong GST before it gets paid.</p></div></div>
+    <div class="panel"><div class="panel-b"><h3>What the workflow does</h3><ul><li>Reads the invoice attachment and extracts every field</li><li>Checks line totals, 10% GST and the ABN checksum</li><li>Blocks duplicates before they reach payment</li><li>Sends bills over your limit for approval and posts clean ones straight to the register</li></ul></div></div>
+    <div class="panel"><div class="panel-b"><h3>In a real build</h3><ul><li>Trigger: Gmail or Outlook folder, or a shared drive</li><li>Reading: PDF text extraction, OCR for scans</li><li>AI: Claude or OpenAI with a fixed invoice schema</li><li>Output: Google Sheets, Excel, Xero or MYOB draft bills, plus a Slack or email exceptions report</li></ul></div></div>
+  </section>
+
+  <p class="note">Personal demo with fictional suppliers and invoices. The AI step is simulated in your browser with rule-based extraction; the GST, total and ABN checks are real calculations. Nothing you type is sent anywhere.</p>
+</main>
+
+<script src="engine.js"></script>
+<script>
+(() => {
+  const { esc, pill, kv, card, money, find, parseMoney } = WD;
+
+  // Existing rows in the bills register (fictional)
+  const sheet = [
+    { date: '02/10/2026', supplier: 'Metro Cleaning Services', inv: 'MCS-7781', category: 'Cleaning', total: 880.00, status: 'Paid' },
+    { date: '05/10/2026', supplier: 'CloudDesk Software', inv: 'CD-55120', category: 'Software subscriptions', total: 329.00, status: 'Approved' },
+    { date: '08/10/2026', supplier: 'Bayside Courier', inv: 'BC-1093', category: 'Freight & postage', total: 146.30, status: 'Approved' },
+  ];
+  const APPROVAL_LIMIT = 2000;
+
+  const samples = [
+    { label: 'Clean invoice', meta: 'From: accounts@coastalprintco.com.au · 1 PDF attached', text: `
+Subject: Invoice INV-20418 from Coastal Print Co
+
+Hi, please find attached our invoice for last week's print job. Thanks!
+
+--- Attachment: INV-20418.pdf ---
+TAX INVOICE
+Coastal Print Co
+ABN: 49 624 595 711
+
+Invoice Number: INV-20418
+Invoice Date: 09/10/2026
+Due Date: 09/11/2026
+
+A4 flyers, full colour   2000 x $0.32   $640.00
+Pull-up banner 850mm   2 x $210.00   $420.00
+Design changes (hours)   2 x $90.00   $180.00
+
+Subtotal: $1,240.00
+GST: $124.00
+Total: $1,364.00` },
+    { label: 'Needs approval', meta: 'From: office@northsideelectrical.com.au · 1 PDF attached', text: `
+Subject: Northside Electrical – Tax Invoice 3307
+
+Hello, invoice for the switchboard upgrade attached.
+
+--- Attachment: Invoice_3307.pdf ---
+TAX INVOICE
+Northside Electrical
+ABN: 85 661 250 090
+
+Invoice No: NE-3307
+Invoice Date: 10/10/2026
+Due Date: 24/10/2026
+
+Switchboard upgrade (labour)   1 x $1,850.00   $1,850.00
+RCD safety switches   6 x $145.00   $870.00
+Compliance certificate   1 x $1,080.00   $1,080.00
+
+Subtotal: $3,800.00
+GST: $380.00
+Total: $4,180.00` },
+    { label: 'Figures wrong', meta: 'From: hello@greenleafplants.com.au · 1 PDF attached', text: `
+Subject: Plant hire invoice
+
+Hi team, monthly plant hire invoice attached.
+
+--- Attachment: GL-INV-889.pdf ---
+TAX INVOICE
+Greenleaf Plant Hire
+ABN: 12 345 678 901
+
+Invoice #: GL-889
+Invoice Date: 11/10/2026
+Due Date: 25/10/2026
+
+Indoor plant hire, monthly   12 x $28.00   $336.00
+Replacement pots   3 x $18.00   $54.00
+
+Subtotal: $390.00
+GST: $42.00
+Total: $442.00` },
+    { label: 'Duplicate', meta: 'From: billing@metrocleaning.com.au · 1 PDF attached', text: `
+Subject: REMINDER – Invoice MCS-7781
+
+Hi, just resending this invoice in case it was missed.
+
+--- Attachment: MCS-7781.pdf ---
+TAX INVOICE
+Metro Cleaning Services
+ABN: 73 569 568 058
+
+Invoice Number: MCS-7781
+Invoice Date: 01/10/2026
+Due Date: 15/10/2026
+
+Office clean, weekly   4 x $200.00   $800.00
+
+Subtotal: $800.00
+GST: $80.00
+Total: $880.00` },
+  ];
+
+  const CATS = [
+    [/print|flyer|banner|design/i, 'Marketing & print'],
+    [/electric|switchboard|plumb|repair|maintenance/i, 'Repairs & maintenance'],
+    [/clean/i, 'Cleaning'],
+    [/plant|hire/i, 'Office & premises'],
+    [/software|subscription|licen[cs]e/i, 'Software subscriptions'],
+    [/courier|freight|postage/i, 'Freight & postage'],
+  ];
+
+  function abnValid(abn) {
+    const d = (abn || '').replace(/\D/g, '').split('').map(Number);
+    if (d.length !== 11) return false;
+    d[0] -= 1;
+    const w = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+    return d.reduce((a, n, i) => a + n * w[i], 0) % 89 === 0;
+  }
+  const close = (a, b) => a != null && b != null && Math.abs(a - b) < 0.02;
+
+  function extract(t) {
+    const supplier = find(t, /TAX INVOICE\s*\n\s*(.+)/i) || find(t, /from\s+([A-Z][\w&' ]+?)\s*$/im) || 'Unknown supplier';
+    const abn = find(t, /ABN[:\s]*([\d ]{11,16})/i);
+    const inv = find(t, /^[ \t]*Invoice[ \t]*(?:Number|No\.?|#)[ \t]*:[ \t]*([A-Z0-9][\w-]*)/im);
+    const date = find(t, /Invoice Date\s*:?\s*([\d/.-]+)/i);
+    const due = find(t, /Due(?: Date)?\s*:?\s*([\d/.-]+)/i);
+    const lines = [];
+    for (const l of t.split('\n')) {
+      const m = l.match(/^\s*(.+?)\s{2,}([\d,]+)\s*x\s*\$?([\d,]+(?:\.\d+)?)\s+\$?([\d,]+(?:\.\d+)?)\s*$/i);
+      if (m) lines.push({ desc: m[1].trim(), qty: parseMoney(m[2]), unit: parseMoney(m[3]), amount: parseMoney(m[4]) });
+    }
+    const subtotal = parseMoney(find(t, /Subtotal\s*:?\s*\$?([\d,]+(?:\.\d+)?)/i));
+    const gst = parseMoney(find(t, /GST\s*:?\s*\$?([\d,]+(?:\.\d+)?)/i));
+    const total = parseMoney(find(t, /^\s*Total\s*:?\s*\$?([\d,]+(?:\.\d+)?)/im));
+    const category = (CATS.find(([re]) => re.test(t)) || [, 'Uncategorised'])[1];
+    return { supplier, abn, inv, date, due, lines, subtotal, gst, total, category };
+  }
+
+  function checks(x) {
+    const lineSum = x.lines.reduce((a, l) => a + (l.amount || 0), 0);
+    const badLines = x.lines.filter((l) => !close(l.qty * l.unit, l.amount));
+    const out = [];
+    out.push(badLines.length ? ['bad', `Line maths: ${badLines.length} line(s) don't add up`] : ['good', `Line maths: ${x.lines.length} lines add up`]);
+    out.push(close(lineSum, x.subtotal) ? ['good', `Lines total ${money(lineSum)} = subtotal`] : ['bad', `Lines total ${money(lineSum)} but subtotal says ${money(x.subtotal)}`]);
+    const expGst = x.subtotal != null ? Math.round(x.subtotal * 10) / 100 : null;
+    out.push(close(expGst, x.gst) ? ['good', `GST is 10% (${money(x.gst)})`] : ['bad', `GST should be ${money(expGst)} but invoice says ${money(x.gst)}`]);
+    out.push(close((x.subtotal || 0) + (x.gst || 0), x.total) ? ['good', `Subtotal + GST = total ${money(x.total)}`] : ['bad', `Subtotal + GST = ${money((x.subtotal || 0) + (x.gst || 0))} but total says ${money(x.total)}`]);
+    out.push(abnValid(x.abn) ? ['good', `ABN ${x.abn} passes checksum`] : ['bad', `ABN ${x.abn || '(missing)'} fails checksum, confirm supplier details`]);
+    return out;
+  }
+
+  function sheetTable(highlight) {
+    const rows = sheet.map((r, i) => `<tr class="${i === highlight ? (r.flag ? 'flagged' : 'new') : ''}"><td class="rownum">${i + 2}</td><td>${esc(r.date)}</td><td>${esc(r.supplier)}</td><td>${esc(r.inv)}</td><td>${esc(r.category)}</td><td class="num">${money(r.total, '$')}</td><td>${esc(r.status)}</td></tr>`).join('');
+    return `<div class="sheet-scroll"><table class="sheet"><thead><tr><th class="rownum"></th><th>Date</th><th>Supplier</th><th>Invoice #</th><th>Category</th><th class="num">Total</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
+  WD.init({
+    id: 'invoice-capture',
+    samples,
+    steps: [
+      { icon: '⚡', title: 'Email with attachment', tool: 'Gmail / Outlook', desc: 'New message in the bills@ inbox with a PDF.' },
+      { icon: '⎙', title: 'Read the invoice', tool: 'PDF text / OCR', desc: 'Turn the attachment into text.' },
+      { icon: '✦', title: 'Extract invoice fields', tool: 'AI · invoice schema', ai: true, desc: 'Supplier, ABN, number, dates, lines, GST, total, category.' },
+      { icon: '✓', title: 'Check the numbers', tool: 'Code', desc: 'Line maths, 10% GST, totals, ABN checksum.' },
+      { icon: '⌕', title: 'Duplicate check', tool: 'Sheet lookup', desc: 'Same supplier + invoice number already logged?' },
+      { icon: '⑂', title: 'Apply approval rule', tool: 'Router', desc: `Over $${APPROVAL_LIMIT.toLocaleString()} or any failed check → needs a person.` },
+      { icon: '▤', title: 'Add to bills register', tool: 'Google Sheets / Xero', desc: 'Append the row with status and a link to the PDF.' },
+      { icon: '✉', title: 'Notify accounts', tool: 'Slack / email', desc: 'Only exceptions and approvals. Clean bills stay quiet.' },
+    ],
+    process(text) {
+      const x = extract(text);
+      const c = checks(x);
+      const failed = c.filter(([t]) => t === 'bad');
+      const dup = sheet.find((r) => r.inv.toLowerCase() === (x.inv || '').toLowerCase() && r.supplier.toLowerCase() === x.supplier.toLowerCase());
+      const over = (x.total || 0) > APPROVAL_LIMIT;
+      const status = dup ? 'Duplicate' : failed.length ? 'Query supplier' : over ? 'Awaiting approval' : 'Approved';
+      const steps = [
+        'Attachment found: 1 PDF',
+        `${text.split('\n').length} lines of text read`,
+        JSON.stringify({ supplier: x.supplier, abn: x.abn || null, invoice: x.inv || null, date: x.date || null, due: x.due || null, lines: x.lines.length, subtotal: x.subtotal, gst: x.gst, total: x.total, category: x.category }, null, 1).replace(/\n\s*/g, ' '),
+        failed.length ? `${failed.length} check(s) failed` : 'All 5 checks passed',
+        dup ? `Already logged on row ${sheet.indexOf(dup) + 2} (${dup.status})` : 'No duplicate found',
+        dup ? 'Duplicate → do not add, reply to supplier' : failed.length ? 'Failed checks → query supplier' : over ? `${money(x.total)} > limit → manager approval` : 'Under limit, checks passed → auto-approve',
+        dup ? { skip: true, text: 'Skipped (duplicate)' } : `Row ${sheet.length + 2} added · status "${status}"`,
+        status === 'Approved' ? { skip: true, text: 'No alert needed' } : 'Alert sent to #accounts',
+      ];
+      let hi = -1;
+      if (!dup) {
+        sheet.push({ date: x.date, supplier: x.supplier, inv: x.inv, category: x.category, total: x.total, status, flag: status !== 'Approved' });
+        hi = sheet.length - 1;
+      } else hi = sheet.indexOf(dup);
+      const tone = { Approved: 'good', 'Awaiting approval': 'warn', 'Query supplier': 'bad', Duplicate: 'neutral' }[status];
+      const cards = [];
+      cards.push(card('Extracted invoice', x.inv || 'no invoice number', kv([
+        ['Supplier', `<b>${esc(x.supplier)}</b>`, true], ['ABN', x.abn], ['Invoice #', x.inv], ['Dates', `Issued ${x.date || '—'} · due ${x.due || '—'}`],
+        ['Category', x.category], ['Subtotal', money(x.subtotal)], ['GST', money(x.gst)], ['Total', `<b>${money(x.total)}</b>`, true],
+        ['Outcome', pill(status, tone), true],
+      ]) + (x.lines.length ? `<div class="sheet-scroll" style="margin-top:10px"><table class="sheet"><thead><tr><th>Line item</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th></tr></thead><tbody>${x.lines.map((l) => `<tr><td>${esc(l.desc)}</td><td class="num">${l.qty}</td><td class="num">${money(l.unit, '$')}</td><td class="num">${money(l.amount, '$')}</td></tr>`).join('')}</tbody></table></div>` : '')));
+      cards.push(card('Checks', `${c.length - failed.length}/${c.length} passed`, c.map(([t, m]) => `<div class="flag">${pill(t === 'good' ? 'Pass' : 'Fail', t)}<span>${esc(m)}</span></div>`).join('') + (dup ? `<div class="flag">${pill('Dup', 'bad')}<span>Same invoice already on row ${sheet.indexOf(dup) + 2}, marked ${esc(dup.status)}</span></div>` : '')));
+      cards.push(card('Google Sheets · Bills register', dup ? 'no change' : `row ${hi + 2} appended`, sheetTable(hi)));
+      if (status !== 'Approved') {
+        const msg = dup
+          ? `⚠️ <b>Duplicate invoice blocked</b>\n${esc(x.supplier)} ${esc(x.inv)} (${money(x.total)}) is already on the register as ${esc(dup.status)}.\nSuggested reply to supplier drafted: ${dup.status === 'Paid' ? `"This invoice has already been paid, remittance attached."` : `"We've already received this invoice and it's being processed."`}`
+          : failed.length
+            ? `❗ <b>Invoice needs checking</b>\n${esc(x.supplier)} ${esc(x.inv)} · ${money(x.total)}\n${failed.map(([, m]) => '• ' + esc(m)).join('\n')}\nStatus set to "Query supplier". Not sent for payment.`
+            : `🟡 <b>Approval needed</b> · @Finance manager\n${esc(x.supplier)} ${esc(x.inv)} · ${money(x.total)} (over $${APPROVAL_LIMIT.toLocaleString()})\nAll checks passed · due ${esc(x.due)}`;
+        cards.push(card('Slack · #accounts', 'just now', `<div class="msg">${msg}</div>${!dup && !failed.length ? '<div class="review-bar"><button class="btn approve" type="button">Approve</button><button class="btn ghost" type="button">Reject</button></div>' : ''}`));
+      }
+      return { steps, cards, stats: [['Rows', dup ? '0 added' : '1 added'], ['Exceptions', String(failed.length + (dup ? 1 : 0))]] };
+    },
+    after(root) {
+      root.querySelectorAll('.approve').forEach((b) => b.addEventListener('click', () => {
+        const last = sheet[sheet.length - 1]; last.status = 'Approved'; last.flag = false;
+        b.textContent = '✓ Approved, register updated'; b.disabled = true;
+        const t = root.querySelector('table.sheet tr.flagged'); if (t) { t.className = 'new'; t.lastElementChild.textContent = 'Approved'; }
+      }));
+    },
+  });
+})();
+</script>
+</body>
+</html>

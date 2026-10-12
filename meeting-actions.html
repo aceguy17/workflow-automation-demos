@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meeting Notes to Tasks</title>
+<meta name="description" content="Personal demo: an AI workflow that turns a meeting transcript into a summary, decisions, owned tasks with due dates and a follow-up email.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar"><div class="wrap">
+  <a class="brand" href="index.html"><span class="brand-mark">⇢</span>Workflow Automation Demos</a>
+  <nav id="nav" aria-label="Demos"></nav>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">Demo 3 · Projects &amp; teams</p>
+    <h1>Meeting notes to tasks: every action gets an owner and a date</h1>
+    <p class="lede">When a meeting ends, the transcript or notes go into the workflow. AI writes the summary, pulls out decisions, risks and action items, works out who owns each one and when it's due, creates the tasks in your project tool and drafts the follow-up email.</p>
+    <div class="badges"><span class="badge">Trigger: Zoom / Teams / Meet transcript</span><span class="badge">Owners and due dates resolved</span><span class="badge">Asana, Notion, Trello, ClickUp</span><span class="badge">Fictional sample data</span></div>
+  </section>
+
+  <div class="grid">
+    <section class="panel col-input" aria-labelledby="h-in">
+      <div class="panel-h"><span class="step-n">1</span><h2 id="h-in">Transcript or notes</h2></div>
+      <div class="panel-b">
+        <div class="samples" id="samples"></div>
+        <div class="input-meta" id="meta"></div>
+        <label class="sr" for="src">Meeting transcript</label>
+        <textarea class="src" id="src" spellcheck="false"></textarea>
+        <div class="actions"><button class="btn" id="run" type="button">▶ Run workflow</button><button class="btn ghost" id="reset" type="button">Reset</button><span class="hint">Works with speaker transcripts or "Action:" notes.</span></div>
+      </div>
+    </section>
+
+    <section class="panel col-pipe" aria-labelledby="h-pipe">
+      <div class="panel-h"><span class="step-n">2</span><h2 id="h-pipe">Workflow</h2></div>
+      <div class="panel-b"><ol class="pipe" id="pipe"></ol><div class="runstats" id="stats"></div></div>
+    </section>
+
+    <section class="panel col-results" aria-labelledby="h-out">
+      <div class="panel-h"><span class="step-n">3</span><h2 id="h-out">What lands in your tools</h2></div>
+      <div class="panel-b"><div class="results" id="results" aria-live="polite"></div></div>
+    </section>
+  </div>
+
+  <section class="explain">
+    <div class="panel"><div class="panel-b"><h3>The problem</h3><p>Actions get agreed in meetings and then live in someone's notebook. Nobody is sure who owns what, follow-up emails go out days later, and the same items come up again next week.</p></div></div>
+    <div class="panel"><div class="panel-b"><h3>What the workflow does</h3><ul><li>Writes a short summary with decisions, risks and questions</li><li>Finds every action and who said they'd do it</li><li>Turns "by next Friday" into a real due date</li><li>Creates tasks and sends a follow-up to attendees</li></ul></div></div>
+    <div class="panel"><div class="panel-b"><h3>In a real build</h3><ul><li>Trigger: Zoom, Teams or Google Meet transcript, Otter or Fireflies, or a notes doc</li><li>AI: Claude or OpenAI with a task schema and your team list</li><li>Tasks: Asana, Notion, Trello, ClickUp, Monday or Salesforce</li><li>Follow-up: Gmail or Outlook draft, plus a calendar invite for the next meeting</li></ul></div></div>
+  </section>
+
+  <p class="note">Personal demo with fictional people and companies. The AI step is simulated in your browser with rule-based extraction so you can try your own notes. Nothing you type is sent anywhere.</p>
+</main>
+
+<script src="engine.js"></script>
+<script>
+(() => {
+  const { esc, pill, kv, card, find, initials } = WD;
+
+  const samples = [
+    { label: 'Project kickoff', meta: 'Zoom transcript · 32 min · 4 speakers', text: `
+Meeting: Website relaunch kickoff – Brightline Physio
+Date: 13/10/2026
+Attendees: Priya Raman, Irfan Iqbal, Sam Lee, Jess Ortiz
+
+Priya: Thanks all. Main goal is to have the new site live before the December rush.
+Irfan: Agreed. We decided to go with the 5-page structure plus an online booking link.
+Sam: I'll send the brand guidelines and logo files by Thursday.
+Priya: Jess, can you collect staff photos and bios for all 6 clinics by next Friday?
+Jess: Yes, no problem. One concern is that two clinics are still waiting on new photos, which could delay things.
+Irfan: I'll prepare the sitemap and wireframes by Monday.
+Priya: We agreed the budget stays at $7,000 including the chatbot.
+Sam: Who signs off the final copy?
+Priya: I will. I'll review the copy within 2 days of receiving it.
+Irfan: Great. Let's catch up next Tuesday at 10am.` },
+    { label: 'Weekly ops notes', meta: 'Notes doc · Monday ops meeting', text: `
+Meeting: Weekly ops meeting – Harbour Joinery
+Date: 12/10/2026
+Attendees: Daniel Ng, Mia Chen, Ravi Patel
+
+Notes
+- Workshop running at 85% capacity, two big kitchen jobs start next week
+- Timber supplier price increase of 6% from November
+- Decided: pass the increase on to new quotes only, not existing jobs
+- Risk: delivery van is due for a service and may be off the road for 2 days
+
+Actions
+- Action: Mia – update the quote template with new timber prices by Wednesday
+- Action: Ravi – book the van service for a quiet day this week
+- Action: Daniel – call the top 3 clients about the price change by end of month
+- Action: Mia – send the updated job schedule to the team tomorrow` },
+    { label: 'Client discovery call', meta: 'Google Meet transcript · 24 min · 2 speakers', text: `
+Meeting: Discovery call – The Corner Roastery
+Date: 14/10/2026
+Attendees: Tom Bassett, Irfan Iqbal
+
+Tom: Most of our wholesale questions are about minimum orders, delivery days and pricing.
+Irfan: The chatbot can answer those from an approved FAQ list. I'll draft the first 20 questions and answers by Friday.
+Tom: Sounds good. We agreed to start with the website first and add the chatbot in phase two.
+Irfan: Tom, can you send me your current wholesale price list and delivery zones by Monday?
+Tom: Will do. My only worry is the cost of keeping the chatbot updated.
+Irfan: I'll include a simple update process and a monthly cost estimate in the proposal by next Wednesday.
+Tom: Perfect. Let's catch up next Thursday to go through the proposal.` },
+  ];
+
+  const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const fmt = (d) => d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+
+  function resolveDue(phrase, base) {
+    if (!phrase) return null;
+    const p = phrase.toLowerCase();
+    if (/tomorrow/.test(p)) return addDays(base, 1);
+    if (/end of (the )?month/.test(p)) return new Date(base.getFullYear(), base.getMonth() + 1, 0);
+    if (/this week/.test(p)) return addDays(base, (5 - base.getDay() + 7) % 7);
+    if (/^next week$/.test(p.replace(/^by\s+/, ''))) return addDays(base, ((1 - base.getDay() + 7) % 7) || 7);
+    const m = p.match(/(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)/);
+    if (m) {
+      const target = DAYS.indexOf(m[2]);
+      let diff = (target - base.getDay() + 7) % 7 || 7;
+      if (m[1]) { const toSunday = (7 - base.getDay()) % 7 || 7; if (diff <= toSunday) diff += 7; }
+      return addDays(base, diff);
+    }
+    const n = p.match(/within (\d+) days?/);
+    if (n && !/receiv/.test(p)) return addDays(base, +n[1]);
+    return null;
+  }
+  const DUE_RE = /\s*(by (?:next |this )?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|end of (?:the )?month)|by end of (?:the )?month|(?:next |this )?week|tomorrow|within \d+ days?(?: of [\w ]+)?|for a quiet day this week)\b\.?/i;
+
+  const tidy = (s) => { s = s.replace(/[?.!]+$/, '').trim(); return s.charAt(0).toUpperCase() + s.slice(1); };
+
+  function parse(t) {
+    const title = find(t, /^\s*Meeting:\s*(.+)$/im) || t.trim().split('\n')[0].slice(0, 80);
+    const dm = find(t, /^\s*Date:\s*(\d{1,2}\/\d{1,2}\/\d{4})/im);
+    const base = dm ? new Date(+dm.split('/')[2], +dm.split('/')[1] - 1, +dm.split('/')[0]) : new Date();
+    let attendees = find(t, /^\s*Attendees:\s*(.+)$/im).split(/,\s*/).filter(Boolean);
+    const lines = t.split('\n').map((l) => l.trim()).filter(Boolean);
+    const speakerRe = /^([A-Z][a-z]+(?: [A-Z][a-z]+)?):\s+(.+)$/;
+    const firstNames = attendees.map((a) => a.split(' ')[0]);
+    const fullName = (fn) => attendees.find((a) => a.split(' ')[0].toLowerCase() === String(fn).toLowerCase()) || fn;
+    const speakers = new Set();
+    const decisions = [], risks = [], questions = [], tasks = [], context = [];
+    let next = null;
+
+    const addTask = (owner, raw) => {
+      const dueM = raw.match(DUE_RE);
+      const duePhrase = dueM ? dueM[1] : '';
+      let text = raw.replace(DUE_RE, '').replace(/^(i'll|i will|will)\s+/i, '');
+      text = tidy(text);
+      const due = resolveDue(duePhrase, base);
+      tasks.push({ owner: fullName(owner), text, duePhrase: duePhrase.replace(/^by\s+/i, ''), due });
+    };
+
+    lines.forEach((line, i) => {
+      if (/^(Meeting|Date|Attendees):/i.test(line) || /^(notes|actions)$/i.test(line)) return;
+      let speaker = '', body = line.replace(/^[-•*]\s*/, '');
+      const sm = line.match(speakerRe);
+      if (sm && !/^(Action|Decided|Decision|Risk|Note)$/i.test(sm[1])) { speaker = sm[1]; body = sm[2]; speakers.add(speaker); }
+
+      const act = body.match(/^Action:\s*([A-Z][a-z]+)\s*[–-]\s*(.+)$/i);
+      if (act) { addTask(act[1], act[2]); return; }
+      if (/^(Decided|Decision):/i.test(body)) { decisions.push(tidy(body.replace(/^(Decided|Decision):\s*/i, ''))); return; }
+      if (/^Risk:/i.test(body)) { risks.push(tidy(body.replace(/^Risk:\s*/i, ''))); return; }
+
+      const nm = body.match(/(?:let's\s+)?(?:catch up|meet|regroup|reconvene)\s+((?:next|this|on)\s+\w+(?:\s+at\s+[\w:]+)?)/i);
+      if (nm) next = nm[1];
+
+      body.split(/(?<=[.!?])\s+/).forEach((sent) => {
+        let m;
+        if ((m = sent.match(/(?:we\s+)?(?:decided|agreed)\s+(?:to\s+|that\s+|on\s+)?(.+)/i)) && !/^agreed\.?$/i.test(sent)) {
+          let d = m[1].replace(/^(go with|the)\s+/i, (x) => x.toLowerCase().startsWith('go') ? 'Go with ' : 'The ');
+          decisions.push(tidy(d));
+        } else if (/concern|worry|worried|risk|could delay|blocker|blocked/i.test(sent)) {
+          risks.push(tidy(sent.replace(/^(one concern is that|one concern:|my only worry is|my worry is)\s*/i, '')));
+        } else if ((m = sent.match(/^([A-Z][a-z]+),\s*can you\s+(.+)/))) {
+          addTask(m[1], m[2].replace(/\bme\b/i, speaker ? speaker.split(' ')[0] : 'me').replace(/\byour\b/gi, 'the'));
+        } else if ((m = sent.match(/^(?:I'll|I will)\s+(.+)/i)) && speaker && sent.length > 12) {
+          addTask(speaker, m[1]);
+        } else if ((m = sent.match(/^([A-Z][a-z]+) will\s+(.+)/)) && firstNames.includes(m[1])) {
+          addTask(m[1], m[2]);
+        } else if (/\?$/.test(sent) && !/can you/i.test(sent)) {
+          const nextLine = lines[i + 1] || '';
+          const ans = nextLine.match(speakerRe);
+          if (ans && /^(I will|I'll|me)\b/i.test(ans[2]) && /^who\s+/i.test(sent)) decisions.push(`${fullName(ans[1]).split(' ')[0]} ${sent.replace(/^who\s+/i, '').replace(/\?$/, '')}`);
+          else questions.push(sent);
+        } else if ((m = sent.match(/most of our (\w+) questions are about (.+)/i))) {
+          context.push(`Most ${m[1]} questions are about ${m[2].replace(/\.$/, '')}`);
+        } else if (/goal|capacity|price increase/i.test(sent)) {
+          context.push(tidy(sent.replace(/^main goal/i, 'The main goal')));
+        }
+      });
+    });
+    if (!attendees.length) attendees = [...speakers];
+    return { title, base, attendees, decisions, risks, questions, tasks, context, next, speakers: [...speakers] };
+  }
+
+  function summary(x) {
+    const ctx = x.context[0] ? x.context[0].replace(/\.$/, '') + '. ' : '';
+    const owners = [...new Set(x.tasks.map((t) => t.owner.split(' ')[0]))];
+    const nd = x.decisions.length;
+    const dec = nd ? `${nd} decision${nd > 1 ? 's were' : ' was'} made` : 'No decisions were recorded';
+    const acts = x.tasks.length ? ` and ${x.tasks.length} action${x.tasks.length > 1 ? 's' : ''} assigned to ${owners.join(', ').replace(/, ([^,]*)$/, ' and $1')}` : ' and no actions were assigned';
+    const risk = x.risks.length ? ` ${x.risks.length} risk${x.risks.length > 1 ? 's' : ''} flagged to watch.` : '';
+    return `${ctx}${dec}${acts}.${risk}`;
+  }
+
+  WD.init({
+    id: 'meeting-actions',
+    samples,
+    steps: [
+      { icon: '⚡', title: 'Meeting ended', tool: 'Zoom / Teams / Meet', desc: 'Transcript or notes become available.' },
+      { icon: '☰', title: 'Clean transcript', tool: 'Code', desc: 'Split by speaker, drop filler, match names to the team list.' },
+      { icon: '✦', title: 'Summarise the meeting', tool: 'AI', ai: true, desc: 'Short summary, decisions, risks, open questions.' },
+      { icon: '✦', title: 'Extract action items', tool: 'AI · task schema', ai: true, desc: 'What, who owns it, and when.' },
+      { icon: '◷', title: 'Resolve due dates', tool: 'Code', desc: '"By next Friday" → an actual date from the meeting date.' },
+      { icon: '▤', title: 'Create tasks', tool: 'Asana / Notion', desc: 'One task per action, assigned, dated, linked to the notes.' },
+      { icon: '✉', title: 'Draft follow-up email', tool: 'AI → Gmail draft', ai: true, desc: 'Summary and action list for all attendees.' },
+      { icon: '▦', title: 'Book next meeting', tool: 'Calendar', desc: 'If a follow-up was agreed, send a placeholder invite.' },
+    ],
+    process(text) {
+      const x = parse(text);
+      const soon = (d) => d && (d - x.base) / 864e5 <= 3;
+      const sum = summary(x);
+      const nextDate = x.next ? resolveDue(x.next.replace(/\s+at\s+.*/, ''), x.base) : null;
+      const steps = [
+        `"${x.title}" · ${text.trim().split('\n').length} lines`,
+        `${x.attendees.length} attendees${x.speakers.length ? ', ' + x.speakers.length + ' speakers matched' : ''}`,
+        `${x.decisions.length} decision(s) · ${x.risks.length} risk(s) · ${x.questions.length} open question(s)`,
+        x.tasks.length ? x.tasks.map((t) => `${t.owner.split(' ')[0]}: ${t.text.slice(0, 48)}${t.text.length > 48 ? '…' : ''}`).join('\n') : 'No actions found',
+        x.tasks.filter((t) => t.duePhrase).map((t) => `"${t.duePhrase}" → ${t.due ? fmt(t.due) : 'kept as text'}`).join('\n') || 'No dates mentioned',
+        `${x.tasks.length} tasks created`,
+        `Draft to ${x.attendees.length} attendees`,
+        x.next ? `Invite: ${nextDate ? fmt(nextDate) : x.next}${/at\s+(\S+)/i.test(x.next) ? ' ' + x.next.match(/at\s+(\S+)/i)[1] : ''}` : { skip: true, text: 'No follow-up meeting mentioned' },
+      ];
+      const cards = [];
+      cards.push(card('Meeting summary', 'AI', `<p style="margin-top:0">${esc(sum)}</p>` +
+        (x.decisions.length ? `<p style="margin:10px 0 4px"><b>Decisions</b></p><ul class="tight">${x.decisions.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>` : '') +
+        (x.risks.length ? `<p style="margin:10px 0 4px"><b>Risks</b></p><ul class="tight">${x.risks.map((d) => `<li>${pill('Risk', 'warn')} ${esc(d)}</li>`).join('')}</ul>` : '') +
+        (x.questions.length ? `<p style="margin:10px 0 4px"><b>Open questions</b></p><ul class="tight">${x.questions.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>` : '')));
+      const project = x.title.split(/\s+[–-]\s+/)[1] || 'Meeting actions';
+      cards.push(card('Asana · ' + project, `${x.tasks.length} tasks`, x.tasks.length ? `<div class="tasks">${x.tasks.map((t) => `<div class="task"><span class="box" aria-hidden="true"></span><div><div>${esc(t.text)}</div><div class="task-meta"><span><span class="avatar">${esc(initials(t.owner))}</span>${esc(t.owner)}</span>${t.due ? pill('Due ' + fmt(t.due), soon(t.due) ? 'bad' : 'info') : t.duePhrase ? pill(t.duePhrase, 'neutral') : pill('No date, owner to set', 'neutral')}${soon(t.due) ? pill('High priority', 'warn') : ''}</div></div></div>`).join('')}</div>` : '<p>No action items found. Try lines like "I\'ll send the report by Friday" or "Action: Sam – book the venue".</p>'));
+      const first = (n) => n.split(' ')[0];
+      const body = `Hi all,\n\nThanks for your time today. Here's a quick recap of ${x.title.split(/\s+[–-]\s+/)[0].toLowerCase()}.\n\n${sum}\n` +
+        (x.decisions.length ? `\nDecisions\n${x.decisions.map((d) => '• ' + d).join('\n')}\n` : '') +
+        (x.tasks.length ? `\nActions\n${x.tasks.map((t) => `• ${first(t.owner)}: ${t.text}${t.due ? ' (' + fmt(t.due) + ')' : t.duePhrase ? ' (' + t.duePhrase + ')' : ''}`).join('\n')}\n` : '') +
+        (x.risks.length ? `\nTo watch\n${x.risks.map((d) => '• ' + d).join('\n')}\n` : '') +
+        (x.next ? `\nNext catch-up: ${nextDate ? fmt(nextDate) : x.next}${/at\s+(\S+)/i.test(x.next) ? ' at ' + x.next.match(/at\s+(\S+)/i)[1] : ''}. Invite to follow.\n` : '') +
+        `\nLet me know if I've missed anything.\n\nIrfan`;
+      cards.push(card('Email draft', 'needs approval', `<div class="email-meta"><div><b>To:</b> ${esc(x.attendees.join(', '))}</div><div><b>Subject:</b> Notes and actions: ${esc(x.title)}</div></div><div class="msg">${esc(body)}</div><div class="review-bar"><button class="btn approve" type="button">Approve &amp; send</button><button class="btn ghost" type="button">Edit</button></div>`));
+      if (x.next) cards.push(card('Calendar', 'invite drafted', kv([['Event', 'Follow-up: ' + x.title.split(/\s+[–-]\s+/)[0]], ['When', `${nextDate ? fmt(nextDate) : x.next}${/at\s+(\S+)/i.test(x.next) ? ', ' + x.next.match(/at\s+(\S+)/i)[1] : ''}`], ['Guests', x.attendees.join(', ')], ['Agenda', 'Review open actions from the last meeting']])));
+      return { steps, cards, stats: [['Tasks', String(x.tasks.length)], ['Decisions', String(x.decisions.length)]] };
+    },
+    after(root) {
+      root.querySelectorAll('.approve').forEach((b) => b.addEventListener('click', () => { b.textContent = '✓ Sent (demo, nothing actually sent)'; b.disabled = true; }));
+    },
+  });
+})();
+</script>
+</body>
+</html>

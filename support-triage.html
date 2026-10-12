@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Support Triage</title>
+<meta name="description" content="Personal demo: an AI workflow that categorises support tickets, sets priority and SLA, routes them to the right team and drafts a reply from the knowledge base.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar"><div class="wrap">
+  <a class="brand" href="index.html"><span class="brand-mark">⇢</span>Workflow Automation Demos</a>
+  <nav id="nav" aria-label="Demos"></nav>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">Demo 4 · Customer support</p>
+    <h1>Support triage: every ticket categorised, prioritised and routed in seconds</h1>
+    <p class="lede">A customer writes in. The workflow looks them up, AI works out what the ticket is about and how urgent and upset they are, sets the priority and SLA, routes it to the right team and drafts a reply from your help articles. Outages get escalated straight away.</p>
+    <div class="badges"><span class="badge">Trigger: helpdesk / support inbox</span><span class="badge">Customer plan aware</span><span class="badge">Reply drafts from your help articles</span><span class="badge">Fictional sample data</span></div>
+  </section>
+
+  <div class="grid">
+    <section class="panel col-input" aria-labelledby="h-in">
+      <div class="panel-h"><span class="step-n">1</span><h2 id="h-in">New support ticket</h2></div>
+      <div class="panel-b">
+        <div class="samples" id="samples"></div>
+        <div class="input-meta" id="meta"></div>
+        <label class="sr" for="src">Ticket text</label>
+        <textarea class="src" id="src" spellcheck="false"></textarea>
+        <div class="actions"><button class="btn" id="run" type="button">▶ Run workflow</button><button class="btn ghost" id="reset" type="button">Reset</button><span class="hint">Tickets build up in the queue as you run more samples.</span></div>
+      </div>
+    </section>
+
+    <section class="panel col-pipe" aria-labelledby="h-pipe">
+      <div class="panel-h"><span class="step-n">2</span><h2 id="h-pipe">Workflow</h2></div>
+      <div class="panel-b"><ol class="pipe" id="pipe"></ol><div class="runstats" id="stats"></div></div>
+    </section>
+
+    <section class="panel col-results" aria-labelledby="h-out">
+      <div class="panel-h"><span class="step-n">3</span><h2 id="h-out">What lands in your tools</h2></div>
+      <div class="panel-b"><div class="results" id="results" aria-live="polite"></div></div>
+    </section>
+  </div>
+
+  <section class="explain">
+    <div class="panel"><div class="panel-b"><h3>The problem</h3><p>Every ticket lands in one queue. Someone reads each one to decide what it is and who should take it, urgent problems wait behind "how do I" questions, and agents write the same answers over and over.</p></div></div>
+    <div class="panel"><div class="panel-b"><h3>What the workflow does</h3><ul><li>Looks up the customer's plan and history</li><li>Works out the category, urgency and tone</li><li>Sets priority and SLA, routes to the right team</li><li>Drafts a reply from the matching help article and escalates outages</li></ul></div></div>
+    <div class="panel"><div class="panel-b"><h3>In a real build</h3><ul><li>Trigger: Zendesk, Freshdesk, Help Scout, Gorgias, Salesforce Service Cloud or a shared inbox</li><li>AI: Claude or OpenAI with your categories and help articles</li><li>Lookup: CRM or billing system (HubSpot, Stripe, Shopify)</li><li>Escalation: Slack or Teams, with an on-call mention for P1</li></ul></div></div>
+  </section>
+
+  <p class="note">Personal demo for a fictional software company ("Tallyhub") and fictional customers. The AI steps are simulated in your browser with rule-based classification. Nothing you type is sent anywhere.</p>
+</main>
+
+<script src="engine.js"></script>
+<script>
+(() => {
+  const { esc, pill, kv, card, find, initials } = WD;
+
+  const CUSTOMERS = {
+    'liam@saltwaterbakery.com.au': { company: 'Saltwater Bakery', plan: 'Business', since: '2023', mrr: 249, open: 0 },
+    'accounts@fernandco.com.au': { company: 'Fern & Co', plan: 'Starter', since: '2025', mrr: 49, open: 1 },
+    'hello@pagesandpaper.com.au': { company: 'Pages & Paper', plan: 'Growth', since: '2024', mrr: 129, open: 0 },
+    'nina@studiomoss.com': { company: 'Studio Moss', plan: 'Starter', since: '2026', mrr: 49, open: 0 },
+    'orders@kettleandcrumb.com.au': { company: 'Kettle & Crumb', plan: 'Growth', since: '2024', mrr: 129, open: 0 },
+  };
+
+  const samples = [
+    { label: 'Outage', meta: 'support@tallyhub.example · via email · 8:47 am', text: `
+From: Liam O'Connor <liam@saltwaterbakery.com.au>
+Subject: POS NOT SYNCING - losing sales!!
+
+Our point of sale has not synced with inventory since this morning. Two registers are showing items as out of stock when they're not and we can't take card payments on the second register.
+
+This is really urgent, it's Saturday trade and we're losing sales. Please call me on 0413 555 882.
+
+Liam` },
+    { label: 'Billing', meta: 'support@tallyhub.example · via web form · 10:12 am', text: `
+From: Grace Fernandez <accounts@fernandco.com.au>
+Subject: Charged twice this month
+
+Hi, I've been charged twice for my subscription this month ($49.00 on the 1st and again on the 3rd). Can you please refund the duplicate payment? This is the second time this has happened, which is frustrating.
+
+Thanks,
+Grace` },
+    { label: 'How-to', meta: 'support@tallyhub.example · via chat widget · 11:30 am', text: `
+From: Arjun Mehta <hello@pagesandpaper.com.au>
+Subject: Export customer list
+
+Hello, how do I export my customer list to a CSV file? I want to import it into our email newsletter tool.
+
+Thanks!` },
+    { label: 'Order delivery', meta: 'support@tallyhub.example · via email · 1:05 pm', text: `
+From: Ella Wright <orders@kettleandcrumb.com.au>
+Subject: Card reader order #48213
+
+Hi there, we ordered a second card reader (order #48213) last week and it still hasn't arrived. Can you tell me where it is? We need it before our market stall on the weekend.
+
+Ella` },
+    { label: 'Feature request', meta: 'support@tallyhub.example · via in-app feedback · 3:40 pm', text: `
+From: Nina Rossi <nina@studiomoss.com>
+Subject: Idea: dark mode
+
+Love using Tallyhub at the studio! Would be great if there was a dark mode for the register screen, it's quite bright in the evenings. Just a suggestion, thanks.` },
+  ];
+
+  const CATS = [
+    { name: 'Technical issue', re: /not sync|sync|error|crash|not working|down|outage|can't take|cannot|bug|out of stock when/i, base: 2, team: 'Tier 2 Support', agent: 'Alex Kim', kb: 'KB-112 · Fixing sync issues between registers and inventory' },
+    { name: 'Billing', re: /charged|refund|invoice|payment|subscription|billing/i, base: 2, team: 'Billing', agent: 'Mei Tan', kb: 'KB-031 · Refunds and duplicate charges' },
+    { name: 'Order & delivery', re: /order #?\d+|arrive|delivery|shipping|tracking|where is/i, base: 3, team: 'Fulfilment', agent: 'Jordan Lee', kb: 'KB-207 · Tracking your hardware order' },
+    { name: 'How-to', re: /how do i|how can i|how to|where do i find|export|import/i, base: 4, team: 'Tier 1 Support', agent: 'Sarah Bell', kb: 'KB-058 · Export customers to CSV' },
+    { name: 'Feature request', re: /would be great|feature|suggestion|idea|wish|could you add/i, base: 4, team: 'Product', agent: 'Chris Novak', kb: '' },
+  ];
+  const SLA = { 1: '1 hour', 2: '4 hours', 3: '1 business day', 4: '2 business days' };
+  const PT = { 1: 'bad', 2: 'warn', 3: 'info', 4: 'neutral' };
+  const queue = [
+    { id: 1041, customer: 'Harbour Gift Co', cat: 'How-to', p: 4, agent: 'Sarah Bell', status: 'Pending' },
+    { id: 1042, customer: 'Bright Bean', cat: 'Billing', p: 3, agent: 'Mei Tan', status: 'Open' },
+  ];
+  let nextId = 1043;
+
+  function analyse(t) {
+    const fromName = find(t, /^From:\s*([^<\n]+?)\s*</im) || 'there';
+    const email = find(t, /<([^>]+)>/) || find(t, /([\w.+-]+@[\w-]+(\.[\w-]+)+)/);
+    const subject = find(t, /^Subject:\s*(.+)$/im) || '(no subject)';
+    const body = t.replace(/^(From|Subject):.*$/gim, '');
+    // Feature requests are checked last so "would be great" doesn't hide a real problem
+    let cat = CATS.slice(0, 4).find((c) => c.re.test(body + ' ' + subject)) || (CATS[4].re.test(body) ? CATS[4] : null);
+    if (!cat) cat = { name: 'General', base: 3, team: 'Tier 1 Support', agent: 'Sarah Bell', kb: '' };
+    const urgentHits = (body.match(/urgent|asap|losing (sales|money)|since this morning|can't take|immediately|right now|need it before/gi) || []);
+    const neg = ((subject + ' ' + body).match(/frustrat|unacceptable|ridiculous|angry|losing|second time|still hasn't|!!|not happy|terrible/gi) || []).length;
+    const posi = (body.match(/love|thanks|great|appreciate|cheers/gi) || []).length;
+    const sentiment = neg >= 2 ? 'Frustrated' : neg === 1 ? 'Concerned' : posi ? 'Positive' : 'Neutral';
+    const cust = CUSTOMERS[(email || '').toLowerCase()] || null;
+    let p = cat.base;
+    const reasons = [`${cat.name} starts at P${cat.base}`];
+    if (urgentHits.length) { p -= 1; reasons.push(`urgency words: "${urgentHits.slice(0, 2).join('", "')}"`); }
+    if (cust && cust.plan === 'Business') { p -= 1; reasons.push('Business plan customer'); }
+    if (neg >= 2 && cat.name !== 'Feature request' && p > 2) { p -= 1; reasons.push('repeat problem, customer frustrated'); }
+    p = Math.max(1, Math.min(4, p));
+    const order = find(body, /order\s*#?\s*(\d{4,})/i);
+    const amount = find(body, /\$([\d,]+(?:\.\d{2})?)/);
+    const phone = find(body, /((\+61|0)4(?:[ -]?\d){8})/);
+    return { fromName, first: fromName.split(' ')[0], email, subject, cat, sentiment, urgentHits, cust, p, reasons, order, amount, phone };
+  }
+
+  function reply(x) {
+    const hi = `Hi ${x.first},\n\n`;
+    const sign = `\n\nKind regards,\n${x.cat.agent.split(' ')[0]}\nTallyhub Support`;
+    switch (x.cat.name) {
+      case 'Technical issue': return hi + `I'm sorry about this, especially on a busy trading day. I've raised this as our highest priority and an engineer is looking at your account now.${x.phone ? ` We'll call you on ${x.phone} within the hour.` : ''}\n\nIn the meantime, you can usually get card payments working again by restarting the register app and choosing "Resync inventory" from Settings → Sync (${x.cat.kb.split(' · ')[0]}). Any sales taken offline will sync automatically once the connection is back.` + sign;
+      case 'Billing': return hi + `Sorry about the double charge${x.amount ? ` of $${x.amount}` : ''}, and that it's happened more than once. I've asked our billing team to refund the duplicate payment today. It usually shows in your account within 3–5 business days.\n\nWe're also checking why the duplicate happened so it doesn't happen again, and I'll let you know what we find.` + sign;
+      case 'Order & delivery': return hi + `Thanks for letting us know.${x.order ? ` I've checked order #${x.order}` : ' I\'ve checked your order'} and asked our fulfilment team to confirm where it is with the courier. You'll have tracking details from us by the end of today.\n\nIf it won't arrive in time for your weekend market, we can send a replacement by express post at no cost.` + sign;
+      case 'How-to': return hi + `Good question. To export your customer list, go to Customers → All customers, click Export at the top right and choose CSV. The file includes name, email, phone and total spend, and it imports into most newsletter tools.\n\nThere's a step-by-step guide here: ${x.cat.kb}.` + sign;
+      case 'Feature request': return hi + `Thanks so much for the kind words and the suggestion! I've passed dark mode for the register screen on to our product team and added your vote. We'll let you know if it makes it onto the roadmap.` + sign;
+      default: return hi + `Thanks for getting in touch. I've passed your message to the right team and we'll get back to you shortly.` + sign;
+    }
+  }
+
+  function queueTable(hiId) {
+    const sorted = [...queue].sort((a, b) => a.p - b.p || a.id - b.id);
+    return `<div class="sheet-scroll"><table class="sheet"><thead><tr><th>#</th><th>Customer</th><th>Category</th><th>Priority</th><th>Assignee</th><th>Status</th></tr></thead><tbody>${sorted.map((r) => `<tr class="${r.id === hiId ? 'new' : ''}"><td>${r.id}</td><td>${esc(r.customer)}</td><td>${esc(r.cat)}</td><td>${pill('P' + r.p, PT[r.p])}</td><td>${esc(r.agent)}</td><td>${esc(r.status)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+
+  WD.init({
+    id: 'support-triage',
+    samples,
+    steps: [
+      { icon: '⚡', title: 'New ticket created', tool: 'Helpdesk', desc: 'Email, web form, chat or in-app message.' },
+      { icon: '⌕', title: 'Look up the customer', tool: 'CRM / billing', desc: 'Plan, account age, open tickets.' },
+      { icon: '✦', title: 'Classify the ticket', tool: 'AI', ai: true, desc: 'Category and which part of the product.' },
+      { icon: '✦', title: 'Read urgency and tone', tool: 'AI', ai: true, desc: 'How urgent, how upset, any repeat problem.' },
+      { icon: '⚖', title: 'Set priority and SLA', tool: 'Rules', desc: 'Category + urgency + customer plan → P1–P4.' },
+      { icon: '⑂', title: 'Route to the right team', tool: 'Router', desc: 'Assign the team and the agent on shift.' },
+      { icon: '✎', title: 'Draft reply from help articles', tool: 'AI + knowledge base', ai: true, desc: 'Agent reviews, edits and sends.' },
+      { icon: '⚠', title: 'Escalate if critical', tool: 'Slack / Teams', desc: 'P1 tickets alert the on-call engineer.' },
+    ],
+    process(text) {
+      const x = analyse(text);
+      const id = nextId++;
+      const status = x.cat.name === 'How-to' ? 'Pending (answer drafted)' : x.cat.name === 'Feature request' ? 'Logged to product board' : 'Open';
+      queue.push({ id, customer: x.cust ? x.cust.company : x.fromName, cat: x.cat.name, p: x.p, agent: x.cat.agent, status });
+      const steps = [
+        `Ticket #${id} · "${x.subject}"`,
+        x.cust ? `${x.cust.company} · ${x.cust.plan} plan · customer since ${x.cust.since} · ${x.cust.open} open tickets` : `No account found for ${x.email || 'sender'}`,
+        `${x.cat.name}`,
+        `Tone: ${x.sentiment}${x.urgentHits.length ? ' · urgent' : ''}`,
+        `P${x.p} · respond within ${SLA[x.p]}\n(${x.reasons.join('; ')})`,
+        `${x.cat.team} → ${x.cat.agent}`,
+        x.cat.kb ? `Used ${x.cat.kb.split(' · ')[0]} · draft ready` : 'Draft ready',
+        x.p === 1 ? 'Posted to #support-urgent, paged on-call' : { skip: true, text: `Not needed (P${x.p})` },
+      ];
+      const cards = [];
+      cards.push(card('Helpdesk · Ticket #' + id, 'fields updated', kv([
+        ['Customer', `<b>${esc(x.fromName)}</b>${x.cust ? ' · ' + esc(x.cust.company) : ''}`, true],
+        x.cust && ['Account', `${x.cust.plan} plan · since ${x.cust.since} · A$${x.cust.mrr}/mo`],
+        ['Category', x.cat.name],
+        ['Priority', `${pill('P' + x.p, PT[x.p])} respond within ${esc(SLA[x.p])}`, true],
+        ['Tone', pill(x.sentiment, x.sentiment === 'Frustrated' ? 'bad' : x.sentiment === 'Concerned' ? 'warn' : x.sentiment === 'Positive' ? 'good' : 'neutral'), true],
+        ['Assigned', `<span class="avatar">${esc(initials(x.cat.agent))}</span>${esc(x.cat.agent)} · ${esc(x.cat.team)}`, true],
+        ['Tags', [x.cat.name.toLowerCase().replace(/[^a-z]+/g, '-'), x.urgentHits.length && 'urgent', x.order && 'order-' + x.order, x.cust && x.cust.plan.toLowerCase() + '-plan'].filter(Boolean).join(', ')],
+        ['Why this priority', x.reasons.join('; ')],
+      ])));
+      if (x.p === 1) cards.push(card('Slack · #support-urgent', 'just now', `<div class="msg">🚨 <b>P1: ${esc(x.subject)}</b> · @on-call\n${esc(x.cust ? x.cust.company + ' (' + x.cust.plan + ' plan)' : x.fromName)} · ticket #${id}\nPayments and inventory sync affected. Customer is ${esc(x.sentiment.toLowerCase())}${x.phone ? ', asked for a call on ' + esc(x.phone) : ''}.\nAssigned to ${esc(x.cat.agent)} · respond within 1 hour</div>`));
+      cards.push(card('Reply draft', 'agent to review', `<div class="email-meta"><div><b>To:</b> ${esc(x.email || '')}</div><div><b>Subject:</b> Re: ${esc(x.subject)}</div>${x.cat.kb ? `<div><b>Source:</b> ${esc(x.cat.kb)}</div>` : ''}</div><div class="msg">${esc(reply(x))}</div><div class="review-bar"><button class="btn approve" type="button">Send reply</button><button class="btn ghost" type="button">Edit</button></div>`));
+      cards.push(card('Support queue', 'sorted by priority', queueTable(id)));
+      return { steps, cards, stats: [['Priority', 'P' + x.p], ['Queue', queue.length + ' tickets']] };
+    },
+    after(root) {
+      root.querySelectorAll('.approve').forEach((b) => b.addEventListener('click', () => { b.textContent = '✓ Sent (demo, nothing actually sent)'; b.disabled = true; }));
+    },
+  });
+})();
+</script>
+</body>
+</html>

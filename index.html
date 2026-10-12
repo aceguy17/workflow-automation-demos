@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workflow Automation Demos</title>
+<meta name="description" content="Four interactive demos of AI workflow automation: lead qualification, invoice capture, meeting notes to tasks and support triage.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar"><div class="wrap">
+  <a class="brand" href="index.html"><span class="brand-mark">⇢</span>Workflow Automation Demos</a>
+  <nav id="nav" aria-label="Demos"></nav>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">AI workflow automation · personal demos</p>
+    <h1>Take the copy-paste work out of your week</h1>
+    <p class="lede">Four working demos of the automations I build for small businesses. Each one takes something that arrives every day (an enquiry, an invoice, a meeting, a support ticket), uses AI to read it and hands clean, checked results to the tools you already use. Pick one, load a sample or paste your own text, and press run.</p>
+    <div class="badges"><span class="badge">n8n · Make · Zapier</span><span class="badge">Claude / OpenAI</span><span class="badge">CRM, Sheets, Xero, Asana, Slack, helpdesks</span><span class="badge">A person approves anything that goes out</span></div>
+  </section>
+
+  <div class="demo-grid">
+    <a class="panel demo-card" href="lead-qualifier.html">
+      <p class="eyebrow">Sales &amp; enquiries</p>
+      <h3>AI lead qualifier</h3>
+      <p>Reads a website enquiry, scores the lead, creates or updates the CRM record, alerts the team and drafts a personal reply. Spam never reaches the CRM.</p>
+      <div class="flow-line"><span class="s">Web form</span><span class="a">→</span><span class="s">AI extract + score</span><span class="a">→</span><span class="s">CRM</span><span class="a">→</span><span class="s">Slack</span><span class="a">→</span><span class="s">Reply draft</span></div>
+      <div class="go">Open demo →</div>
+    </a>
+    <a class="panel demo-card" href="invoice-capture.html">
+      <p class="eyebrow">Finance &amp; admin</p>
+      <h3>Invoice capture</h3>
+      <p>Pulls supplier, ABN, line items, GST and totals out of emailed invoices, checks the maths, blocks duplicates, applies an approval limit and adds the row to the bills register.</p>
+      <div class="flow-line"><span class="s">Bills inbox</span><span class="a">→</span><span class="s">AI extract</span><span class="a">→</span><span class="s">GST / ABN checks</span><span class="a">→</span><span class="s">Sheet / Xero</span></div>
+      <div class="go">Open demo →</div>
+    </a>
+    <a class="panel demo-card" href="meeting-actions.html">
+      <p class="eyebrow">Projects &amp; teams</p>
+      <h3>Meeting notes → tasks</h3>
+      <p>Turns a transcript into a summary, decisions and risks, and tasks with owners and real due dates. Then drafts the follow-up email and the next calendar invite.</p>
+      <div class="flow-line"><span class="s">Transcript</span><span class="a">→</span><span class="s">AI summary + actions</span><span class="a">→</span><span class="s">Asana / Notion</span><span class="a">→</span><span class="s">Email</span></div>
+      <div class="go">Open demo →</div>
+    </a>
+    <a class="panel demo-card" href="support-triage.html">
+      <p class="eyebrow">Customer support</p>
+      <h3>Support ticket triage</h3>
+      <p>Looks up the customer, works out the category, urgency and tone, sets priority and SLA, routes to the right team, drafts a reply from help articles and escalates outages.</p>
+      <div class="flow-line"><span class="s">Helpdesk</span><span class="a">→</span><span class="s">AI classify</span><span class="a">→</span><span class="s">Priority + route</span><span class="a">→</span><span class="s">Reply draft</span></div>
+      <div class="go">Open demo →</div>
+    </a>
+  </div>
+
+  <p class="note">Personal demos with fictional businesses, people and data. AI steps are simulated in the browser with rule-based logic so anyone can try them without an account, and nothing you type leaves your browser. Client builds connect to the real systems and an LLM API, with error handling, logging and human review where it matters.</p>
+</main>
+<script src="engine.js"></script>
+<script>WD.nav('');</script>
+</body>
+</html>
